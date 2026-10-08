@@ -1,0 +1,23 @@
+# What the bootloader of SONOFF_DUAL_R3 is built with. Every firmware build of this board reads this one file,
+# because `idf.py flash` writes the bootloader together with the image, and a bootloader built with other
+# options would quietly replace the one the board boots with.
+CONFIG_IDF_TARGET="esp32"
+
+# 4 MB flash on a classic ESP32. Dual I/O at 40 MHz: the mode Tasmota flashes this board with (dout 40m,
+# tasmota-templates/_templates/sonoff_DUALR3), and the flash chip of the board is not identified.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_40M=y
+
+# The partition table of this board, one for all its images: factory for the recovery image, ota_0 for
+# MicroPython, vfs for files. The images read it at runtime from this offset.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/SONOFF_DUAL_R3/partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x10000
+
+# With rollback, switching boot to ota_0 marks that image NEW, and an unconfirmed image falls back to
+# factory on the second boot.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_BOOTLOADER_SKIP_VALIDATE_IN_DEEP_SLEEP=y
+CONFIG_BOOTLOADER_LOG_LEVEL_DEBUG=y

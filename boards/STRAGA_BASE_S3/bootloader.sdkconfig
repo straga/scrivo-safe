@@ -1,0 +1,23 @@
+# What the bootloader of STRAGA_BASE_S3 is built with. Both firmware builds read this one file - MicroPython
+# through micropython/bootloader.sdkconfig, the recovery image as boards/STRAGA_BASE_S3/bootloader.sdkconfig -
+# because `idf.py flash` writes the bootloader together with either image, and a bootloader built with other
+# options would quietly replace the one the board boots with.
+CONFIG_IDF_TARGET="esp32s3"
+
+# Flash of the ESP32-S3-WROOM-1 N8R2 module: 8 MB, quad mode at 80 MHz.
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# The partition table of this board, one for both images: factory for the recovery image, ota_0 for
+# MicroPython, vfs for files. Both images read it at runtime from this offset.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/STRAGA_BASE_S3/partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x10000
+
+# With rollback, switching boot to ota_0 marks that image NEW, and an unconfirmed image falls back to
+# factory on the second boot.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_BOOTLOADER_SKIP_VALIDATE_IN_DEEP_SLEEP=y
+CONFIG_BOOTLOADER_LOG_LEVEL_DEBUG=y

@@ -1,0 +1,51 @@
+# STRAGA_BASE_S3: our base board on ESP32-S3-WROOM-1 N8R2. What the hardware gives and does not let go.
+# The folder is named as MicroPython names the board; chip, flash and partitions are in bootloader.sdkconfig,
+# named pins in micropython/pins.csv.
+
+# The button a person holds for 10 s and releases on a running board to take it down to the recovery image in
+# factory; the MicroPython image reads it (image/cmodules/gesture). Held while the chip resets, GPIO0 is the
+# download-mode strap and the chip waits for a firmware upload instead.
+gesture:
+  pin: GPIO0
+  level: low
+
+status_led:
+  platform: neopixel
+  pin: GPIO48
+
+# The pins the board brings out, from the board's hardware notes: what a device may
+# hang on them is the device's word, and a device's pin not listed here is refused by the build (rust_app
+# tools/board_env.py). ADC1 is the block that works beside Wi-Fi. Not listed, as that table says to leave them: 3, 45,
+# 46 - strapping; 19, 20 - USB; 26-32 - the flash and PSRAM; and 43, 44 - UART0, the console behind the USB bridge.
+pins:
+  GPIO0: button, input with pull-up, low when pressed - the gesture above
+  GPIO1: ADC1
+  GPIO2: ADC1
+  GPIO4: ADC1
+  GPIO5: ADC1
+  GPIO6: ADC1
+  GPIO7: ADC1
+  GPIO8: ADC1
+  GPIO9: ADC1
+  GPIO10: ADC1
+  GPIO11: free
+  GPIO12: free
+  GPIO13: free
+  GPIO14: free
+  GPIO15: free
+  GPIO16: free
+  GPIO17: free
+  GPIO18: free
+  GPIO21: free
+  GPIO33: free: the PSRAM of N8R2 is quad and leaves 33-37
+  GPIO34: free: the PSRAM of N8R2 is quad and leaves 33-37
+  GPIO35: free: the PSRAM of N8R2 is quad and leaves 33-37
+  GPIO36: free: the PSRAM of N8R2 is quad and leaves 33-37
+  GPIO37: free: the PSRAM of N8R2 is quad and leaves 33-37
+  GPIO38: free
+  GPIO39: free
+  GPIO40: free
+  GPIO41: free
+  GPIO42: free
+  GPIO47: free, 3.3 V: N8R2 has no V in its marking
+  GPIO48: status LED, neopixel - status_led above

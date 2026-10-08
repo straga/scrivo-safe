@@ -1,0 +1,33 @@
+# SONOFF_DUAL_R3: Sonoff Dual R3 (v2, BL0939) on a classic ESP32, 4 MB flash, no PSRAM, no USB of its own - the
+# console is UART0 (GPIO1 TX, GPIO3 RX) on the pads at the back. The board ground sits on the mains live wire:
+# never power it from the mains while a serial adapter is connected. Chip, flash and partitions are in
+# bootloader.sdkconfig. Folder named as a MicroPython board would be; no MicroPython board for it yet.
+
+# The only button of the board. Recorded, not enabled: GPIO0 is the chip's download-mode strap, held low at
+# power-up it waits for a firmware upload instead.
+gesture:
+  pin: GPIO0
+  level: low
+
+# What the hardware has wired and does not let go. Three sources agree on every pin:
+#   ours     archive/micropython_dev/board/garage/g12_boiler/pin.md, g12_gate/board_file/root/board.yml
+#   tasmota  opt/ref/tasmota-templates/_templates/sonoff_DUALR3_v2 template32, decoded with
+#            opt/ref/tasmota-src/tasmota_template.h (ESP32_TEMPLATE_TO_PHY, enum UserSelectablePins)
+#   driver   archive/micropython_dev/_source/scrivo/module_ext/BL09xx/_runner.py: UART 2, tx 25, rx 26, 4800
+# The box labels its terminals S1, S2, L1, L2, and they run the other way from the numbering Tasmota and the old
+# engine give: S1 is GPIO33 and switches L1 on GPIO14. Taken off the live board 18.09: a key on S1 moved GPIO33,
+# and the relay on GPIO14 switched the L1 output. A person wires by the box, so the names follow the box.
+pins:
+  GPIO0: button, input with pull-up, low when pressed          # ours btn_0; tasmota GPIO_KEY1 1
+  GPIO13: status LED, output, lit on low                        # ours status_output, inverted; tasmota GPIO_LEDLNK_INV 1
+  GPIO27: relay, output - L2 on the box                         # ours r1_output; tasmota GPIO_REL1 1
+  GPIO14: relay, output - L1 on the box                         # ours r2_output; tasmota GPIO_REL1 2
+  GPIO25: UART TX to the BL0939 energy meter                    # ours uart_tx; tasmota GPIO_TXD 1
+  GPIO26: UART RX from the BL0939 energy meter                  # ours uart_rx; tasmota GPIO_BL0939_RX 1
+  GPIO32: switch input, pull-up - S2 on the box                 # ours btn_1; tasmota GPIO_SWT1 1
+  GPIO33: switch input, pull-up - S1 on the box                 # ours btn_2; tasmota GPIO_SWT1 2
+
+status_led:
+  platform: gpio
+  pin: GPIO13
+  inverted: true

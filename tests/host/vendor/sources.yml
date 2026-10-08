@@ -1,0 +1,13 @@
+# Third-party files under tests/host/vendor: where each came from, at which revision, under which licence.
+# They build only into the host tests; nothing here goes into the firmware.
+
+miniz/miniz.c:
+  from: https://github.com/richgel999/miniz
+  path: miniz.c
+  commit: 28f5066e332590c8a68fa4870e89233e72ce7a44   # 2013-10-14, the last commit of v1.15 before the 2016 split into several files
+  version: miniz v1.15, MZ_VERSION "9.1.15"
+  sha256: de6806982c05439dff5548fd466d38d6f6b502d4e257dd38db61a0053c1816fb
+  changed: nothing, the file is byte for byte as at the commit (CRLF line ends included)
+  licence: miniz/LICENSE - the Unlicense statement copied word for word from the end of miniz.c
+  why: the ESP32-S3 ROM carries tinfl from this release (esp_rom/include/miniz.h, MZ_VERSION "9.1.15");
+    the host tests inflate with the same code that main/files_zip.c calls in ROM on the board

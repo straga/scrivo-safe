@@ -1,0 +1,9 @@
+build/
+build-*/
+sdkconfig
+sdkconfig.old
+managed_components/
+.cache/
+__pycache__/
+runs/
+secrets.yaml

@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scrivo recovery</title>
+<style>
+/* Tokens by meaning, not by colour; the letapis palette: paper, ink, lapis, amber. */
+:root {
+  --bg: #F1EDE0; --panel: #F8F5EC; --sunk: #E8E3D3; --line: rgba(31,47,72,.16);
+  --ink: #1F2F48; --dim: #5A6478; --acc: #2D4490; --acc-ink: #F6F3E9; --acc-soft: rgba(45,68,144,.12);
+  --warn: #C98F35; --ok: #3F7A52; --bad: #A8413A;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+html[data-t=d] {
+  --bg: #131B2B; --panel: #1B2537; --sunk: #243049; --line: rgba(233,228,213,.16);
+  --ink: #E9E4D5; --dim: #99A2B8; --acc: #8CA2E8; --acc-ink: #10182A; --acc-soft: rgba(140,162,232,.14);
+  --warn: #EDB562; --ok: #7CC495; --bad: #E88A80;
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--sans); padding: 12px; }
+.app { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.head { display: flex; align-items: center; gap: 8px; }
+.head h1 { font-size: 20px; flex: 1; }
+.tag { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: var(--acc-soft); color: var(--acc); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.card h2 { font-size: 15px; color: var(--dim); font-weight: 600; margin-bottom: 8px; }
+.card h2 + h2, .sub { margin-top: 18px; }
+.row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row span:first-child { color: var(--dim); }
+.row span:last-child { text-align: right; overflow-wrap: anywhere; }
+.mono { font-family: var(--mono); font-size: 14px; }
+.note { font-size: 14px; color: var(--dim); margin-top: 8px; }
+.note.bad { color: var(--bad); }
+.note.ok { color: var(--ok); }
+.hide { display: none !important; }
+label { display: block; font-size: 14px; color: var(--dim); margin: 8px 0 4px; }
+input[type=text], input[type=password], input[type=number] {
+  width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+}
+label.check { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-top: 8px; color: var(--ink); font-size: 15px; }
+label.check input { width: 22px; height: 22px; }
+.btn {
+  display: block; width: 100%; min-height: 48px; margin-top: 12px; font: inherit; font-weight: 600;
+  border: 0; border-radius: 10px; background: var(--acc); color: var(--acc-ink); cursor: pointer;
+}
+.btn.soft { background: var(--acc-soft); color: var(--acc); }
+.btn.danger, .btn.armed { background: var(--bad); color: var(--acc-ink); }
+.btn:disabled { opacity: .5; cursor: default; }
+a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.tabs { display: flex; gap: 4px; background: var(--sunk); border-radius: 12px; padding: 4px; }
+.tabs button {
+  flex: 1; min-height: 44px; font: inherit; font-size: 14px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--dim); cursor: pointer;
+}
+.tabs button.on { background: var(--panel); color: var(--ink); font-weight: 600; }
+.drop {
+  display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 10px 12px; margin-top: 8px;
+  border: 1px dashed var(--line); border-radius: 10px; cursor: pointer; color: var(--dim);
+}
+.drop input { display: none; }
+.bar { position: relative; height: 12px; border-radius: 99px; background: var(--sunk); overflow: hidden; margin-top: 12px; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; transition: width .2s; }
+.bar .ghost { background: var(--acc-soft); }
+.bar .fill { background: var(--acc); }
+.bar .fill.over { background: var(--bad); }
+.files { list-style: none; padding: 0; margin-top: 8px; }
+/* An armed button, wider than an icon, takes a line of its own under the row instead of squeezing the name:
+   the row cannot know how wide the name needs to be, so nothing here depends on it. It goes last, so the
+   buttons after it in the row stay on the name's line. */
+.files li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); min-height: 44px; }
+.files li .name { flex: 1; overflow-wrap: anywhere; }
+.files li .icon.armed { flex: 0 0 100%; order: 1; }
+.files li.dir .name { color: var(--dim); }
+.files li .sig { color: var(--dim); white-space: nowrap; text-align: right; display: inline-flex; align-items: center; }
+/* Signal as a phone shows it: four bars, as many filled as the level earns; the number stays small beside it. */
+.lad { display: inline-flex; align-items: flex-end; gap: 2px; height: 16px; margin-left: 8px; }
+.lad i { display: block; width: 4px; border-radius: 1px; background: var(--line); }
+.lad i:nth-child(1) { height: 25%; } .lad i:nth-child(2) { height: 50%; } .lad i:nth-child(3) { height: 75%; } .lad i:nth-child(4) { height: 100%; }
+.lad i.on { background: var(--acc); }
+.lad.none i { background: var(--bad); opacity: .35; }
+.dbm { font-family: var(--mono); font-size: 13px; color: var(--dim); white-space: nowrap; }
+#s-rssi { display: inline-flex; align-items: center; justify-content: flex-end; }
+.icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;
+  border: 0; border-radius: 9px; background: transparent; color: var(--acc); cursor: pointer;
+}
+.icon.armed { background: var(--bad); color: var(--acc-ink); width: auto; padding: 0 10px; font: inherit; font-size: 13px; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.warnbox { border: 2px solid var(--warn); border-radius: 10px; padding: 12px; margin-top: 12px; }
+.warnbox b { display: block; margin-bottom: 4px; }
+.loss { font-size: 17px; font-weight: 700; color: var(--bad); margin-top: 10px; }
+svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 360px) { body { padding: 6px; } .card { padding: 10px; } }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="head">
+  <!-- A name for people; the machine name scrivo-safe stays where the network needs it (access point, .local). -->
+  <h1>Scrivo</h1>
+  <span class="tag">recovery</span>
+  <button class="icon" id="theme" title="Light or dark">
+    <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+  </button>
+</div>
+
+<!-- State: open to everyone, first on the screen. -->
+<div class="card">
+  <h2>Board</h2>
+  <div class="row"><span>Running</span><span id="s-running">…</span></div>
+  <div class="row"><span>Version</span><span id="s-version" class="mono">…</span></div>
+  <div class="row"><span>Network</span><span id="s-network">…</span></div>
+  <div class="row"><span>Signal</span><span id="s-rssi">…</span></div>
+  <div class="row"><span>Access point</span><span id="s-ap">…</span></div>
+  <div class="row"><span>Saved networks</span><span id="s-nets">…</span></div>
+  <div class="row"><span>Chip</span><span id="s-chip">…</span></div>
+  <div class="row"><span>Flash</span><span id="s-flash">…</span></div>
+  <div class="row"><span>PSRAM</span><span id="s-psram">…</span></div>
+  <div class="row"><span>RAM</span><span id="s-heap">…</span></div>
+  <p class="note" id="s-note">Asking the board for its state...</p>
+</div>
+
+<!-- Set up sign-in: shown only while the board has none, and the board refuses this once it has. -->
+<form class="card hide" id="setup" method="post" action="/credentials">
+  <h2>Set up sign-in</h2>
+  <p class="note">This board has no name and password yet, so firmware and files stay closed. Set them once here;
+     afterwards you sign in with them, and this form is gone.</p>
+  <label for="setup-user">Name</label>
+  <input type="text" id="setup-user" name="user" autocomplete="username" autocapitalize="none" required>
+  <label for="setup-pass">Password, 8 characters or more</label>
+  <input type="password" id="setup-pass" name="password" autocomplete="new-password" minlength="8" required>
+  <label for="setup-pass2">The same password again</label>
+  <input type="password" id="setup-pass2" name="password2" autocomplete="new-password" minlength="8" required>
+  <button class="btn" type="submit">Set it up</button>
+  <p class="note bad hide" id="setup-failed">Not set up: check that the name is filled and both passwords are the same.</p>
+</form>
+
+<!-- Sign in: a form on the page; no browser pop-up anywhere. -->
+<form class="card hide" id="signin" method="post" action="/login">
+  <h2>Sign in to change something</h2>
+  <label for="user">Name</label>
+  <input type="text" id="user" name="user" autocomplete="username" autocapitalize="none" required>
+  <label for="password">Password</label>
+  <input type="password" id="password" name="password" autocomplete="current-password" required>
+  <button class="btn" type="submit">Sign in</button>
+  <p class="note bad hide" id="signin-failed">Wrong name or password.</p>
+</form>
+
+<div class="hide" id="actions">
+  <div class="tabs" id="tabs">
+    <button data-p="fw" class="on">Firmware</button>
+    <button data-p="files">Files</button>
+    <button data-p="net">Network</button>
+    <button data-p="board">Board</button>
+  </div>
+
+  <div class="card pane" id="p-fw">
+    <h2>Main firmware in ota_0</h2>
+    <label class="drop"><input type="file" id="fw-file" accept=".bin">
+      <svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+      <span id="fw-name">Choose micropython.bin</span></label>
+    <label class="drop"><input type="file" id="pt-file" accept=".bin">
+      <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M10 10v9"/></svg>
+      <span id="pt-name">partition-table.bin (optional)</span></label>
+    <div id="fw-parts" style="margin-top: 12px"></div>
+    <div class="bar"><i class="ghost" id="fw-ghost"></i><i class="fill" id="fw-fill"></i></div>
+    <p class="note" id="fw-note">The bar shows how much of ota_0 the file takes.</p>
+    <!-- A firmware built for other partitions: what changes, said before anything is written. -->
+    <div class="warnbox hide" id="pt-diff">
+      <b>This firmware brings other partitions</b>
+      <span id="pt-text"></span>
+      <p class="loss hide" id="pt-loss">All MicroPython files in vfs will be lost. Download what you need from the Files tab first.</p>
+      <button class="btn danger" id="pt-apply">Rewrite the partitions and restart</button>
+    </div>
+    <div class="hide" id="pt-again">
+      <label for="pt-user">Name</label>
+      <input type="text" id="pt-user" autocomplete="username" autocapitalize="none">
+      <label for="pt-pass">Password</label>
+      <input type="password" id="pt-pass" autocomplete="current-password">
+      <button class="btn" id="pt-login">Sign in and write the firmware</button>
+    </div>
+    <p class="note" id="pt-note"></p>
+    <button class="btn" id="fw-send" disabled>Write to ota_0 and boot it</button>
+  </div>
+
+  <div class="card pane hide" id="p-files">
+    <h2>MicroPython files</h2>
+    <div class="bar"><i class="fill" id="fs-fill"></i></div>
+    <p class="note" id="fs-note">…</p>
+    <a class="btn soft" id="fs-zip" href="/files/zip" download="board-files.zip">Download all as zip</a>
+    <ul class="files" id="fs-list"></ul>
+    <p class="note" id="fs-zip-note"></p>
+    <label class="drop"><input type="file" id="up-file">
+      <svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+      <span id="up-name">Choose a file to put on the board</span></label>
+    <label for="up-path">Path on the board</label>
+    <input type="text" id="up-path" class="mono" placeholder="/main.py" autocapitalize="none">
+    <div class="bar"><i class="fill" id="up-fill"></i></div>
+    <button class="btn" id="up-send" disabled>Put the file on the board</button>
+    <p class="note" id="up-note"></p>
+    <!-- Files are written without a restart, so several can be replaced in one visit; this starts them. -->
+    <button class="btn hide" id="up-boot">Boot MicroPython with these files</button>
+    <p class="note" id="up-boot-note"></p>
+  </div>
+
+  <form class="card pane hide" id="p-net">
+    <h2>Saved networks</h2>
+    <ul class="files" id="net-saved"></ul>
+    <p class="note" id="net-saved-note">Tried in this order. Tap the bin twice to remove one; the board restarts.</p>
+    <h2 class="sub">Add a Wi-Fi network</h2>
+    <button class="btn soft" type="button" id="scan">Scan for networks</button>
+    <p class="note" id="scan-note"></p>
+    <ul class="files" id="scan-list"></ul>
+    <label for="ssid">Network</label>
+    <input type="text" id="ssid" name="ssid" maxlength="32" autocapitalize="none" required>
+    <label for="pass">Password</label>
+    <input type="password" id="pass" name="pass" maxlength="64">
+    <button class="btn" type="submit">Save and restart</button>
+    <p class="note" id="net-note">The board restarts and tries this network first.</p>
+  </form>
+
+  <!-- Three separate matters, three cards. -->
+  <div class="pane stack hide" id="p-board">
+    <div class="card">
+      <h2>Going back to the main firmware</h2>
+      <label for="idle-min">Minutes after the last action here before the board boots the main firmware (ota_0)</label>
+      <input type="number" id="idle-min" min="1" max="1440" inputmode="numeric">
+      <button class="btn soft" id="idle-save">Save</button>
+      <label class="check"><input type="checkbox" id="stay"> Stay here until I let go</label>
+      <p class="note" id="set-note">Staying lasts until the board restarts: a reset or a power cut brings the rule above back.</p>
+    </div>
+
+    <div class="card">
+      <h2>Partitions</h2>
+      <p class="note hide" id="pt-list-note"></p>
+      <ul class="files" id="pt-list"></ul>
+      <!-- Shown only when a table from before the last rewrite is kept. -->
+      <button class="btn soft hide" id="pt-restore">Go back to the previous partitions</button>
+      <p class="note" id="pt-restore-note"></p>
+    </div>
+
+    <div class="card">
+      <h2>Restart the board</h2>
+      <button class="btn" id="boot">Boot the main firmware (ota_0)</button>
+      <p class="note" id="boot-note"></p>
+      <button class="btn soft" id="restart">Restart, stay in the recovery image</button>
+      <p class="note" id="restart-note"></p>
+      <form method="post" action="/logout"><button class="btn soft" type="submit">Sign out</button></form>
+    </div>
+  </div>
+</div>
+
+</div>
+<script>
+var $ = function (id) { return document.getElementById(id); };
+var state = null;
+var uploading = 0;
+var pending = null;     // a partition table that came with the firmware: {table, ota0} to write, {refused} when it may not
+var resuming = false;   // the board restarts into new partitions and the page carries on after it
+
+function show(el, on) { el.classList.toggle('hide', !on); }
+function note(el, text, kind) { el.textContent = text; el.className = 'note' + (kind ? ' ' + kind : ''); }
+function size(n) { return n >= 1048576 ? (n / 1048576).toFixed(2) + ' MB' : n >= 1024 ? (n / 1024).toFixed(1) + ' KB' : n + ' B'; }
+function hex(n) { return '0x' + n.toString(16); }
+// Signal: better than -50 excellent, to -60 good, to -70 medium, to -80 weak, worse almost no link.
+var LEVELS = ['almost no link', 'weak', 'medium', 'good', 'excellent'];
+function bars(rssi) { return rssi > -50 ? 4 : rssi >= -60 ? 3 : rssi >= -70 ? 2 : rssi >= -80 ? 1 : 0; }
+// Puts the number and, at the right edge, the ladder into el; the word only where there is room for it.
+function signal(el, rssi, word) {
+  var n = bars(rssi), value = document.createElement('span'), ladder = document.createElement('span');
+  el.textContent = '';
+  value.className = 'dbm';
+  value.textContent = (word ? LEVELS[n] + '  ' : '') + rssi + ' dBm';
+  ladder.className = 'lad' + (n ? '' : ' none');
+  ladder.title = LEVELS[n];
+  for (var i = 1; i <= 4; i++) { var b = document.createElement('i'); if (i <= n) b.className = 'on'; ladder.appendChild(b); }
+  el.appendChild(value);
+  el.appendChild(ladder);
+}
+function form(fields) { return Object.keys(fields).map(function (k) { return k + '=' + encodeURIComponent(fields[k]); }).join('&'); }
+// A second tap does it: the first one only changes the button.
+function armed(b, text) { if (b.classList.contains('armed')) return true; b.classList.add('armed'); b.textContent = text; return false; }
+
+// Theme: the person's choice if made, the system setting otherwise.
+(function () {
+  var saved = null;
+  try { saved = localStorage.getItem('t'); } catch (e) {}
+  var dark = saved ? saved === 'd' : matchMedia('(prefers-color-scheme: dark)').matches;
+  if (dark) document.documentElement.setAttribute('data-t', 'd');
+  $('theme').onclick = function () {
+    var on = document.documentElement.getAttribute('data-t') !== 'd';
+    if (on) document.documentElement.setAttribute('data-t', 'd'); else document.documentElement.removeAttribute('data-t');
+    try { localStorage.setItem('t', on ? 'd' : 'l'); } catch (e) {}
+  };
+})();
+
+// Every request goes through here: an unanswered board is said in words, never left as an empty page.
+// A request without a body gives up after 8 s unless long is set: it is for work the board does in place.
+function call(method, url, body, onProgress, long) {
+  return new Promise(function (resolve) {
+    var x = new XMLHttpRequest();
+    x.open(method, url);
+    x.timeout = body || long ? 0 : 8000;
+    if (onProgress) { uploading++; x.onloadend = function () { uploading--; }; }
+    if (onProgress) x.upload.onprogress = function (e) { onProgress(e.loaded); };
+    x.onload = function () { resolve({status: x.status, text: x.responseText}); };
+    x.onerror = function () { resolve({status: 0, text: 'the board did not answer'}); };
+    x.ontimeout = function () { resolve({status: 0, text: 'no answer in 8 s'}); };
+    x.send(body || null);
+  });
+}
+function json(r) { try { return JSON.parse(r.text); } catch (e) { return null; } }
+
+// The state line says what is now, with its number, and where the switch is from where the person is
+// reading: the Board tab may already be open below, or not shown at all before signing in.
+function stateNote() {
+  if (!state) return;
+  var term = state.idle_return_min + ' min', board = !$('p-board').classList.contains('hide');
+  var signedIn = state.signed_in || !state.credentials_set || resuming;
+  var where = !signedIn ? 'sign in below, then %s on the Board tab' : board ? '%s below' : '%s on the Board tab below';
+  var text;
+  if (state.leaving) {
+    text = 'Going back to the main firmware now; this page stops answering. To come back here on a STRAGA ' +
+           'base S3, switch the power off and on three times, each time within 10 s of the board starting, or ' +
+           'hold BOOT for 10 s and release it; a Sonoff Dual R3 has its button inside the case and comes back ' +
+           'here over the wire.';
+  } else if (state.stay) {
+    text = 'Staying here. To let the board go back to the main firmware ' + term + ' after the last action here, ' +
+           where.replace('%s', 'untick "Stay here until I let go"') + '.';
+  } else if (state.idle_left_s < 0) {
+    text = 'Writing to flash now (a firmware, files or partitions): the ' + term + ' count to go back to the main ' +
+           'firmware starts again when it ends.';
+  } else {
+    text = 'Goes back to the main firmware in ' + (state.idle_left_s < 60 ? 'under a minute' : Math.ceil(state.idle_left_s / 60) + ' min') +
+           ': ' + term + ' after the last action here. To keep it here, ' + where.replace('%s', 'tick "Stay here until I let go"') + '.';
+  }
+  note($('s-note'), text);
+  if (!state.credentials_set) note($('s-note'), 'Sign-in is not set up: firmware and files stay closed until you set a name and password below.', 'bad');
+}
+
+function refresh() {
+  return call('GET', '/status').then(function (r) {
+    if (r.status !== 200) {
+      note($('s-note'), 'The board did not answer /status (' + (r.status || r.text) + '): its state is unknown.', 'bad');
+      return;
+    }
+    state = JSON.parse(r.text);
+    $('s-running').textContent = state.running === 'factory' ? 'recovery image (factory)' : state.running;
+    $('s-version').textContent = state.version;
+    $('s-network').textContent = state.network ? state.network + ', ' + state.ip : 'not joined';
+    if (state.rssi === null || state.rssi === undefined) $('s-rssi').textContent = '—';
+    else signal($('s-rssi'), state.rssi, true);
+    $('s-ap').textContent = state.ap + ' at 192.168.4.1';
+    $('s-nets').textContent = state.networks.length ? state.networks.join(', ') : 'none';
+    // A dash where the chip did not say: a zero would read as "there is none".
+    $('s-chip').textContent = (state.chip || '—') + (state.chip_rev === null ? '' : ', revision ' + state.chip_rev) +
+                              (state.cores === null ? '' : ', ' + state.cores + (state.cores === 1 ? ' core' : ' cores'));
+    $('s-flash').textContent = state.flash === null ? '—' : size(state.flash);
+    $('s-psram').textContent = state.psram === null ? '—' : state.psram === 0 ? 'none in the chip' :
+                               size(state.psram) + ' in the chip, not used by this image';
+    // The chip's own RAM this image can hand out, and how much of it is free now.
+    $('s-heap').textContent = state.heap_free === null ? '—' :
+                              size(state.heap_free) + ' free' + (state.heap_total === null ? '' : ' of ' + size(state.heap_total));
+    stateNote();
+    var allowed = state.signed_in || !state.credentials_set || resuming;
+    if (allowed && !$('fw-parts').textContent) listPartitions();
+    // The board decides this, not the page: once it has credentials it refuses POST /credentials,
+    // for a signed-in browser as well. Hiding the card is how a person sees that, not what enforces it.
+    show($('setup'), !state.credentials_set);
+    show($('signin'), !allowed);
+    show($('actions'), allowed);
+    savedNetworks();
+    if (document.activeElement !== $('idle-min')) $('idle-min').value = state.idle_return_min;
+    $('stay').checked = state.stay;
+    fwCheck();
+  });
+}
+
+// Tabs: all panes stay in the page, one is shown.
+$('tabs').onclick = function (e) {
+  var p = e.target.getAttribute('data-p');
+  if (!p) return;
+  [].forEach.call($('tabs').children, function (b) { b.classList.toggle('on', b === e.target); });
+  ['fw', 'files', 'net', 'board'].forEach(function (id) { show($('p-' + id), id === p); });
+  stateNote();
+  if (p === 'files') listFiles();
+  if (p === 'board') listPartitions();
+};
+
+// Firmware: the file is measured against ota_0 before anything is sent - against the new ota_0 when
+// it brings other partitions.
+function slot() { return pending && pending.ota0 ? pending.ota0 : state.ota0_size; }
+function fwBar(ghost, fill, over) {
+  var total = state && slot() || 1;
+  $('fw-ghost').style.width = Math.min(100, ghost / total * 100) + '%';
+  $('fw-fill').style.width = Math.min(100, fill / total * 100) + '%';
+  $('fw-fill').classList.toggle('over', !!over);
+}
+function fwCheck() {
+  var f = $('fw-file').files[0];
+  if (!f || !state || uploading) return;
+  $('fw-name').textContent = f.name + ', ' + size(f.size);
+  var total = slot(), over = f.size > total, where = pending && pending.table ? 'the new ota_0' : 'ota_0';
+  fwBar(f.size, over ? total : 0, over);
+  note($('fw-note'), over ? 'Too big: ' + (f.size - total) + ' B more than ' + where + ' holds (' + total + ' B).'
+    : size(f.size) + ' of ' + size(total) + ' in ' + where + '.', over ? 'bad' : '');
+  $('fw-send').disabled = over || !!(pending && (pending.refused || pending.table));
+}
+$('fw-file').onchange = fwCheck;
+function sendFirmware() {
+  var f = $('fw-file').files[0];
+  $('fw-send').disabled = true;
+  note($('fw-note'), 'Writing ' + size(f.size) + '...');
+  call('POST', '/update', f, function (done) {
+    fwBar(f.size, done);
+    note($('fw-note'), 'Written ' + size(done) + ' of ' + size(f.size) + '...');
+  }).then(function (r) {
+    note($('fw-note'), r.status === 200 ? r.text : 'Not written (' + (r.status || '') + '): ' + r.text, r.status === 200 ? 'ok' : 'bad');
+    $('fw-send').disabled = r.status === 200;
+  });
+}
+$('fw-send').onclick = sendFirmware;
+
+// The partition table that came with the firmware: the board checks it and says what would change.
+$('pt-file').onchange = function () {
+  var f = $('pt-file').files[0];
+  pending = null;
+  show($('pt-diff'), false);
+  $('pt-apply').classList.remove('armed');
+  $('pt-apply').textContent = 'Rewrite the partitions and restart';
+  $('pt-apply').disabled = false;
+  if (!f) { note($('pt-note'), ''); fwCheck(); return; }
+  $('pt-name').textContent = f.name + ', ' + size(f.size);
+  note($('pt-note'), 'Checking the partitions against the board...');
+  f.arrayBuffer().then(function (table) {
+    return call('POST', '/partitions/check', table).then(function (r) {
+      var d = json(r);
+      if (r.status !== 200 || !d) {
+        pending = {refused: true};
+        note($('pt-note'), 'This firmware is not for this board: ' + (d && d.refused || r.text), 'bad');
+      } else if (d.same) {
+        note($('pt-note'), 'Same partitions as on the board: the firmware goes in as usual.', 'ok');
+      } else {
+        var o = d.changes[0], v = d.changes[1];
+        pending = {table: table, ota0: o.to.size};
+        $('pt-text').textContent = 'ota_0 ' + size(o.from.size) + ' → ' + size(o.to.size) + '; vfs ' + size(v.from.size) +
+          ' at ' + hex(v.from.address) + ' → ' + size(v.to.size) + ' at ' + hex(v.to.address) +
+          '. nvs, otadata, phy_init and factory stay as they are, and the current table is kept for going back.';
+        show($('pt-loss'), d.vfs_moves);
+        show($('pt-diff'), true);
+        note($('pt-note'), 'First the partitions, then the firmware: the board restarts in between.');
+      }
+      fwCheck();
+    });
+  });
+};
+$('pt-apply').onclick = function () {
+  var b = $('pt-apply');
+  if (!armed(b, $('pt-loss').classList.contains('hide') ? 'Tap again to rewrite' : 'Tap again: rewrite and lose the files')) return;
+  b.disabled = true;
+  note($('pt-note'), 'Writing the partition table...');
+  call('POST', '/partitions/apply', pending.table).then(function (r) { afterRewrite(r, $('pt-note')); });
+};
+// After /partitions/apply or /partitions/restore: wait for the board to come back, then carry on.
+function afterRewrite(r, el) {
+  var d = json(r);
+  if (r.status !== 200 || !d) { note(el, 'Not rewritten (' + (r.status || '') + '): ' + (d && d.refused || r.text), 'bad'); return; }
+  if (d.same) { note(el, 'The board already has these partitions.', 'ok'); return; }
+  resuming = true;
+  note(el, 'Partitions rewritten. The board restarts; waiting for it...', 'ok');
+  var tries = 0;
+  var wait = setInterval(function () {
+    if (++tries > 60) {
+      clearInterval(wait);
+      note(el, 'The board has not come back in 2 minutes. Reload the page; if it stays silent, the board needs a wire.', 'bad');
+      return;
+    }
+    call('GET', '/status').then(function (s) {
+      if (s.status !== 200 || !wait) return;
+      clearInterval(wait);
+      wait = null;
+      refresh().then(function () {
+        listPartitions();
+        if (!pending || !pending.table) { resuming = false; note(el, 'The board is back with the new partitions.', 'ok'); return; }
+        pending.table = null;
+        show($('pt-diff'), false);
+        if (state.signed_in) { resuming = false; carryOn(el); return; }
+        show($('pt-again'), true);
+        note(el, 'The board is back with the new partitions. Sign in again to write the firmware.');
+      });
+    });
+  }, 2000);
+}
+function carryOn(el) {
+  fwCheck();
+  if ($('fw-file').files[0] && !$('fw-send').disabled) { note(el, 'Writing the firmware into the new ota_0.', 'ok'); sendFirmware(); }
+  else note(el, 'The board is back with the new partitions. Choose the firmware to write.', 'ok');
+}
+$('pt-login').onclick = function () {
+  call('POST', '/login', form({user: $('pt-user').value, password: $('pt-pass').value})).then(function () {
+    return refresh();
+  }).then(function () {
+    if (!state || !state.signed_in) { note($('pt-note'), 'Wrong name or password.', 'bad'); return; }
+    resuming = false;
+    $('pt-pass').value = '';
+    show($('pt-again'), false);
+    carryOn($('pt-note'));
+  });
+};
+
+// Files: list, download, delete with a second tap, put a file.
+function listFiles() {
+  call('GET', '/files').then(function (r) {
+    if (r.status !== 200) { note($('fs-note'), 'No file list (' + (r.status || '') + '): ' + r.text, 'bad'); return; }
+    var d = JSON.parse(r.text), fs = d.fs, list = $('fs-list');
+    $('fs-fill').style.width = (fs.used_blocks / fs.blocks * 100) + '%';
+    note($('fs-note'), size(fs.used_blocks * fs.block_size) + ' of ' + size(fs.blocks * fs.block_size) + ' used.');
+    list.innerHTML = '';
+    // The board lists a directory before its contents, so the indent by depth draws the tree.
+    d.entries.forEach(function (e) {
+      var li = document.createElement('li'), name = document.createElement('span'), parts = e.path.split('/');
+      li.className = e.dir ? 'dir' : '';
+      name.className = 'name mono';
+      name.style.paddingLeft = (parts.length - 2) * 1.25 + 'em';
+      name.textContent = parts.pop() + (e.dir ? '/' : '');
+      li.appendChild(name);
+      if (!e.dir) {
+        var sig = document.createElement('span');
+        sig.className = 'sig mono'; sig.textContent = size(e.size);
+        li.appendChild(sig);
+        var get = document.createElement('a');
+        get.className = 'icon'; get.title = 'Download'; get.href = '/file?path=' + encodeURIComponent(e.path);
+        get.setAttribute('download', e.path.split('/').pop());
+        get.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>';
+        li.appendChild(get);
+        if (/\.zip$/i.test(e.path)) li.appendChild(unpackButton(e.path));
+      }
+      li.appendChild(binButton('Tap to delete', function () {
+        call('POST', '/file/delete?path=' + encodeURIComponent(e.path), '').then(function (x) {
+          note($('fs-note'), x.status === 200 ? 'Deleted ' + e.path + '.' : 'Not deleted: ' + x.text, x.status === 200 ? 'ok' : 'bad');
+          listFiles();
+        });
+      }));
+      list.appendChild(li);
+    });
+  });
+}
+function binButton(armedText, done) {
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'icon'; b.title = 'Delete';
+  b.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+  b.onclick = function () { if (armed(b, armedText)) done(); };
+  return b;
+}
+// An archive in the list unpacks in two taps: the first asks the board what would change and says it,
+// the second makes the board's files exactly the archive's.
+function unpackButton(path) {
+  var b = document.createElement('button'), q = '?path=' + encodeURIComponent(path), out = $('fs-zip-note');
+  b.type = 'button'; b.className = 'icon'; b.title = 'Unpack';
+  b.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 9h16v11H4zM4 9l2-5h12l2 5M12 18v-6M9 15l3-3 3 3"/></svg>';
+  b.onclick = function () {
+    b.disabled = true;
+    if (b.classList.contains('armed')) {
+      note(out, 'Unpacking ' + path + '…');
+      call('POST', '/files/unpack' + q, '', null, true).then(function (r) {
+        var d = r.status === 200 ? json(r) : null;
+        note(out, d ? 'Unpacked ' + d.files + ' files, ' + size(d.bytes) + (d.removed ? '; removed ' + d.removed + ' not in the archive' : '') +
+                      '; ' + path + ' is deleted.'
+                    : 'Not unpacked (' + (r.status || '') + '): ' + r.text, d ? 'ok' : 'bad');
+        listFiles();
+      });
+      return;
+    }
+    call('POST', '/files/unpack/check' + q, '', null, true).then(function (r) {
+      b.disabled = false;
+      var d = r.status === 200 ? json(r) : null;
+      if (!d) { note(out, 'Cannot unpack ' + path + ' (' + (r.status || '') + '): ' + r.text, 'bad'); return; }
+      var gone = d.remove.map(function (e) { return e.path + (e.dir ? '/' : ''); });
+      note(out, path + ' puts ' + d.files + ' files, ' + size(d.bytes) + ', on the board' +
+                (d.skipped ? ' (' + d.skipped + ' macOS entries skipped)' : '') + '. ' +
+                (gone.length ? 'Removed from the board, because the archive does not have them: ' + gone.join(', ') + '.'
+                             : 'Nothing on the board is removed.'), gone.length ? 'bad' : '');
+      armed(b, gone.length ? 'Tap again: unpack, remove ' + gone.length : 'Tap again to unpack');
+    });
+  };
+  return b;
+}
+$('up-file').onchange = function () {
+  var f = $('up-file').files[0];
+  if (!f) return;
+  $('up-name').textContent = f.name + ', ' + size(f.size);
+  if (!$('up-path').value) $('up-path').value = '/' + f.name;
+  $('up-send').disabled = false;
+};
+$('up-send').onclick = function () {
+  var f = $('up-file').files[0], path = $('up-path').value;
+  $('up-send').disabled = true;
+  call('POST', '/file?path=' + encodeURIComponent(path), f, function (done) {
+    $('up-fill').style.width = (done / f.size * 100) + '%';
+  }).then(function (r) {
+    note($('up-note'), r.status === 200 ? r.text : 'Not saved (' + (r.status || '') + '): ' + r.text, r.status === 200 ? 'ok' : 'bad');
+    $('up-send').disabled = false;
+    if (r.status === 200) show($('up-boot'), true);
+    listFiles();
+  });
+};
+$('up-boot').onclick = function () { bootApp($('up-boot-note')); };
+
+// Saved networks: redrawn only when the list changes, so a half-armed delete survives the polling.
+var shownNetworks = null;
+function savedNetworks() {
+  var key = state.networks.join('\n');
+  if (key === shownNetworks) return;
+  shownNetworks = key;
+  var list = $('net-saved');
+  list.innerHTML = '';
+  state.networks.forEach(function (ssid) {
+    var li = document.createElement('li'), name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = ssid + (ssid === state.network ? '  (joined)' : '');
+    li.appendChild(name);
+    if (ssid === state.network && typeof state.rssi === 'number') {
+      var sig = document.createElement('span');
+      sig.className = 'sig';
+      signal(sig, state.rssi, false);
+      li.appendChild(sig);
+    }
+    li.appendChild(binButton('Tap to remove', function () {
+      call('POST', '/wifi/delete', form({ssid: ssid})).then(function (r) {
+        note($('net-saved-note'), r.status === 200 ? r.text : 'Not removed (' + (r.status || '') + '): ' + r.text, r.status === 200 ? 'ok' : 'bad');
+      });
+    }));
+    list.appendChild(li);
+  });
+  if (!state.networks.length) list.innerHTML = '<li><span class="name">none</span></li>';
+}
+
+// Network scan: a table, name on the left, signal on the right, strongest first; a tap fills the form.
+$('scan').onclick = function () {
+  $('scan').disabled = true;
+  note($('scan-note'), 'Scanning...');
+  call('GET', '/scan').then(function (r) {
+    $('scan').disabled = false;
+    var list = $('scan-list');
+    list.innerHTML = '';
+    if (r.status !== 200) { note($('scan-note'), 'No scan (' + (r.status || '') + '): ' + r.text, 'bad'); return; }
+    var nets = JSON.parse(r.text).networks;
+    note($('scan-note'), nets.length ? nets.length + ' networks. Tap one to fill in its name.' : 'No networks on the air.');
+    nets.forEach(function (n) {
+      var li = document.createElement('li'), name = document.createElement('span'), sig = document.createElement('span');
+      name.className = 'name';
+      name.textContent = n.ssid + (n.open ? '  (open)' : '');
+      sig.className = 'sig';
+      signal(sig, n.rssi, false);
+      li.appendChild(name);
+      li.appendChild(sig);
+      li.onclick = function () { $('ssid').value = n.ssid; $('pass').focus(); };
+      list.appendChild(li);
+    });
+  });
+};
+
+// Network: the board restarts after saving, so the answer is the last thing it says.
+$('p-net').onsubmit = function (e) {
+  e.preventDefault();
+  note($('net-note'), 'Saving...');
+  call('POST', '/wifi', form({ssid: $('ssid').value, pass: $('pass').value})).then(function (r) {
+    note($('net-note'), r.status ? r.text : 'The board did not answer.', r.status === 200 ? 'ok' : 'bad');
+  });
+};
+
+// Going back: minutes in nvs; "stay here" until the next restart.
+$('idle-save').onclick = function () {
+  call('POST', '/settings', form({idle_return_min: $('idle-min').value})).then(function (r) {
+    note($('set-note'), r.status === 200 ? 'Saved: back to the main firmware ' + json(r).idle_return_min + ' min after the last action here.'
+      : 'Not saved: ' + r.text, r.status === 200 ? 'ok' : 'bad');
+    refresh();
+  });
+};
+$('stay').onchange = function () {
+  call('POST', '/settings', form({stay: $('stay').checked ? 1 : 0})).then(function (r) {
+    var reply = r.status === 200 ? json(r) : null;
+    note($('set-note'), !reply ? 'Not changed: ' + r.text : reply.stay
+      ? 'Staying here until you untick "Stay here until I let go" above or the board restarts.'
+      : 'Let go: back to the main firmware ' + reply.idle_return_min + ' min after the last action here.', reply ? 'ok' : 'bad');
+    refresh();
+  });
+};
+
+// Partitions: what the board has now, and the way back to the table before the last rewrite.
+function listPartitions() {
+  call('GET', '/partitions').then(function (r) {
+    var d = json(r), list = $('pt-list');
+    // A refusal is said only while it is true: the next list that arrives takes it away.
+    if (r.status !== 200 || !d) { note($('pt-list-note'), 'No partition list: ' + r.text, 'bad'); show($('pt-list-note'), true); return; }
+    show($('pt-list-note'), false);
+    list.innerHTML = '';
+    var app = {};
+    d.table.forEach(function (p) { app[p.label] = p; });
+    // A row per partition a firmware can change or run from, in flash order as on the Board tab:
+    // factory, ota_0, vfs - the ota_0 / vfs border is what a brought table moves. The name on the
+    // left, used of all on the right.
+    $('fw-parts').innerHTML = '';
+    ['factory', 'ota_0', 'vfs'].filter(function (l) { return app[l]; })
+      .sort(function (a, b) { return app[a].address - app[b].address; }).forEach(function (l) {
+      var row = document.createElement('div'), name = document.createElement('span'), used = document.createElement('span');
+      row.className = 'row';
+      name.className = 'mono';
+      name.textContent = l;
+      used.className = 'mono';
+      used.textContent = size(Math.max(app[l].used, 0)) + ' of ' + size(app[l].size);
+      row.appendChild(name);
+      row.appendChild(used);
+      $('fw-parts').appendChild(row);
+    });
+    d.table.forEach(function (p) {
+      var li = document.createElement('li'), name = document.createElement('span'), used = document.createElement('span');
+      name.className = 'name mono';
+      name.textContent = p.label + '  ' + hex(p.address);
+      used.className = 'sig mono';
+      used.textContent = (p.used >= 0 ? size(p.used) + ' of ' : '') + size(p.size);
+      li.appendChild(name);
+      li.appendChild(used);
+      list.appendChild(li);
+    });
+    show($('pt-restore'), d.previous);
+  });
+}
+$('pt-restore').onclick = function () {
+  var b = $('pt-restore');
+  if (!armed(b, 'Tap again: go back (files in vfs are lost if it moves)')) return;
+  b.disabled = true;
+  note($('pt-restore-note'), 'Writing the previous partition table...');
+  call('POST', '/partitions/restore', '').then(function (r) { afterRewrite(r, $('pt-restore-note')); });
+};
+
+function bootApp(el) {
+  note(el, 'Checking ota_0...');
+  call('POST', '/boot/app', '').then(function (r) {
+    note(el, r.status === 200 ? r.text : 'Not switched: ' + r.text, r.status === 200 ? 'ok' : 'bad');
+  });
+}
+$('boot').onclick = function () { bootApp($('boot-note')); };
+$('restart').onclick = function () {
+  var b = $('restart');
+  if (!armed(b, 'Tap again: restart, stay in the recovery image')) return;
+  b.disabled = true;
+  note($('restart-note'), 'Restarting...');
+  call('POST', '/restart', '').then(function (r) {
+    note($('restart-note'), r.status === 200 ? r.text : 'Not restarted (' + (r.status || '') + '): ' + r.text, r.status === 200 ? 'ok' : 'bad');
+    b.classList.remove('armed');
+    b.textContent = 'Restart, stay in the recovery image';
+    b.disabled = false;
+  });
+};
+
+if (location.search.indexOf('login=failed') >= 0) show($('signin-failed'), true);
+if (location.search.indexOf('setup=failed') >= 0) show($('setup-failed'), true);
+refresh();
+// Fresh state, and an open page keeps the board in the recovery image. Not while a file is going up:
+// the board is busy, and a refresh would redraw the firmware bar under the progress.
+setInterval(function () { if (!uploading && !resuming) refresh(); }, 5000);
+</script>
+</body>
+</html>

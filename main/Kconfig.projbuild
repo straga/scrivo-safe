@@ -1,0 +1,10 @@
+menu "scrivo-safe"
+
+    config SCRIVO_SAFE_MAIN_PROJECT
+        string "Project name of the main firmware this image accepts"
+        default "micropython"
+        help
+            The image takes an upload into the neighbour slot only when the project name in its
+            esp_app_desc_t equals this string. Set it to the project() name of your own firmware.
+
+endmenu

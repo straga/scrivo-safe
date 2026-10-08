@@ -1,0 +1,37 @@
+{
+ "files": {
+  "/boot.py": {
+   "size": 2708,
+   "sha256": "f35b9d4dfb2c2b497c64e96966aa3acf5181113f8a4e420050bfd75b67ffee25"
+  },
+  "/lib/aiorepl.py": {
+   "size": 12605,
+   "sha256": "886c7134e07a58e4afd3141258e7817f0c71e44eb875bddba5ac75a52fde5d8e"
+  },
+  "/lib/boot_counter.py": {
+   "size": 2022,
+   "sha256": "38a01ccba4b17a57856a6d12c54916d31f769f9a6a2caa033507c40d448f3776"
+  },
+  "/lib/wifi_keeper.py": {
+   "size": 7510,
+   "sha256": "6fc7f56ff25c5df1fcc7438feb0ebdb73e3c7fddbb957ab6127d79500248709f"
+  },
+  "/lib/wifi_nvs.py": {
+   "size": 1039,
+   "sha256": "2275f44dad0977a15dfc73d48c7b44b6284cc80c8d195647b82ce54652bea653"
+  },
+  "/main.py": {
+   "size": 1191,
+   "sha256": "0a52a5bc12d8b46f1d737930eb5ccc24f541438ee3dd2743479ef22b1428d5d0"
+  }
+ },
+ "dirs": [
+  "/lib"
+ ],
+ "fs": {
+  "block_size": 4096,
+  "blocks": 1150,
+  "free_blocks": 1134
+ },
+ "running": "ota_0"
+}

@@ -1,0 +1,14 @@
+# What the recovery image needs on any board. Target, flash, partition table and bootloader options come
+# from the board: boards/<BOARD>/bootloader.sdkconfig, read by the MicroPython build of the board as well
+# (CMakeLists.txt); tools/bootloader_match.py compares both builds.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
+
+# A recovery image must not hang: when a task starves the idle task past the watchdog timeout,
+# restart instead of only printing a backtrace. Verifying a broken ota_0 once left the board
+# unreachable for minutes; erasing ota_0 during a normal upload does not trip the watchdog.
+CONFIG_ESP_TASK_WDT_PANIC=y
+
+# HTTP server, captive portal DNS and mDNS share the socket pool; the default 10 is too few
+# (same value as examples/protocols/http_server/captive_portal).
+CONFIG_LWIP_MAX_SOCKETS=16
